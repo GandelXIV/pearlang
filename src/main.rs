@@ -1,4 +1,5 @@
-use std;
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug, PartialEq)]
 enum TokenCategory {
@@ -43,8 +44,21 @@ struct Statement {
 impl Statement {
     fn new(cmd: String) -> Self {
         Self {
-            cmd: Token::from(cmd.to_string()),
+            cmd: Token {
+                name: cmd,
+                category: TokenCategory::Keyword,
+            },
             arg: vec![],
+            block: Block::default(),
+        }
+    }
+    fn new_warg(cmd: String, arg: Vec<Token>) -> Self {
+        Self {
+            cmd: Token {
+                name: cmd,
+                category: TokenCategory::Keyword,
+            },
+            arg,
             block: Block::default(),
         }
     }
@@ -74,7 +88,7 @@ fn parse(raw: String) -> Block {
                 Some(word) => word.push(x),
                 None => word = Some(x.to_string()),
             },
-            ' ' => {
+            ' ' | '\n' => {
                 if let Some(word) = word.take() {
                     match &mut statement {
                         Some(statement) => statement.arg.push(if islaststring {
@@ -89,13 +103,17 @@ fn parse(raw: String) -> Block {
                     }
                 }
                 islaststring = false;
-            }
-            '\n' => {
-                if let Some(mut statement) = statement.take() {
-                    if let Some(word) = word.take() {
-                        statement.arg.push(Token::from(word));
+                // kinda ugly but who cares
+                match chr {
+                    '\n' => {
+                        if let Some(mut statement) = statement.take() {
+                            if let Some(word) = word.take() {
+                                statement.arg.push(Token::from(word));
+                            }
+                            block.push(statement);
+                        }
                     }
-                    block.push(statement);
+                    _ => {}
                 }
             }
             x => match &mut word {
@@ -105,63 +123,6 @@ fn parse(raw: String) -> Block {
         }
     }
     return block;
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_line_and_spaces_stmnt() {
-        assert_eq!(
-            parse("echo abc    def\n".to_string()),
-            vec![Statement {
-                cmd: Token {
-                    category: TokenCategory::Keyword,
-                    name: "echo".to_string()
-                },
-                arg: vec![
-                    Token {
-                        category: TokenCategory::Keyword,
-                        name: "abc".to_string()
-                    },
-                    Token {
-                        category: TokenCategory::Keyword,
-                        name: "def".to_string()
-                    }
-                ],
-                block: vec![]
-            }]
-        );
-    }
-
-    #[test]
-    fn test_strings_and_tokencats() {
-        assert_eq!(
-            parse("echo \"Hello World!\" \"123\" 456".into()),
-            vec![Statement {
-                cmd: Token {
-                    category: TokenCategory::Keyword,
-                    name: "echo".to_string()
-                },
-                arg: vec![
-                    Token {
-                        category: TokenCategory::Text,
-                        name: "Hello World!".to_string()
-                    },
-                    Token {
-                        category: TokenCategory::Text,
-                        name: "123".to_string()
-                    },
-                    Token {
-                        category: TokenCategory::Number,
-                        name: "456".to_string()
-                    }
-                ],
-                block: vec![]
-            }]
-        )
-    }
 }
 
 fn main() {
